@@ -9,6 +9,8 @@ import (
 var client *Client
 
 func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	c, err := NewClient("localhost:6379", 0)
 	if err != nil {
 		log.Fatal(err)
@@ -37,12 +39,14 @@ func TestEncodingRequest(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	log.Println(client.sendCommand("SET", "myKey", "myValue"))
-	log.Println(client.sendCommand("GET", "myKey"))
-	log.Println(client.sendCommand("INCR", "myIncK"))
-	log.Println(client.sendCommand("foolbar", "myIncK"))
-	log.Println(client.sendCommand("HMSET", "myhkey", "key1", "value1", "key2", "value2"))
-	//	client.sendCommand("HGETALL", "myhkey")
+	client.Set("myKey", "myValue")
+	for i := 0; i < 10; i ++ {
+		v, _ := client.Get("myKey")
+		if v != "myValue" {
+			t.Errorf("get %s, but shoule be %s\n", v, "myValue")
+		}
+	}
+	client.Del("myKey")
 }
 
 func BenchmarkEncodingRequest(b *testing.B) {
@@ -60,6 +64,14 @@ func BenchmarkGetConn(b *testing.B) {
 		c, _ := client.getCon()
 		client.returnCon(c)
 	}
+}
+
+func BenchmarkGet(b *testing.B) {
+	client.Set("myKey", "myValue")
+	for i := 0; i < b.N; i ++ {
+		client.Get("myKey")
+	}
+	client.Del("myKey")
 }
 
 func BenchmarkStringCopy(b *testing.B) {

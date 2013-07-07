@@ -4,6 +4,7 @@ import (
 	"net"
 	"errors"
 	"strconv"
+	"fmt"
 	//	"log"
 	"log"
 )
@@ -14,8 +15,8 @@ const (
 )
 
 type ByteBuffer struct {
-	buffer                                                                    []byte
-	pos,                                                                limit int
+	buffer                                                                                        []byte
+	pos,                                                                                    limit int
 }
 
 type RedisConn struct {
@@ -85,21 +86,6 @@ type Client struct {
 	pool chan *RedisConn
 }
 
-func NewClient(addr string, db int) (*Client, error) {
-	poolSize := defaultPoolSize
-	pool := make(chan *RedisConn, poolSize)
-	for i := 0; i < poolSize; i++ {
-		pool <- nil
-	}
-	client := &Client{Addr: addr, Db: db, pool: pool}
-	_, err := client.getCon()
-	if err != nil {
-		return nil, err
-	} else {
-		return client, nil
-	}
-}
-
 func (client *Client) getCon() (*RedisConn, error) {
 	c := <-client.pool
 	if c == nil {
@@ -133,7 +119,7 @@ func (c *RedisConn) readLine() ([]byte, error) {
 			}
 		}
 		if c.rbuf.buffer[c.rbuf.pos] == '\r' {
-			c.rbuf.pos += 1
+			c.rbuf.pos += 2
 			break
 		}
 		c.rbuf.pos += 1
@@ -163,7 +149,6 @@ func (client *Client) sendCommand(cmd string, args ...string) (interface {}, err
 	}
 
 	n, err := c.conn.Read(c.rbuf.buffer)
-	log.Println(cmd, c.rbuf.buffer[:n], string(c.rbuf.buffer[:n]), n)
 
 	if err != nil {
 		return nil, err
@@ -173,7 +158,7 @@ func (client *Client) sendCommand(cmd string, args ...string) (interface {}, err
 	if err != nil {
 		return nil, err
 	}
-	log.Println(c.rbuf.buffer[0], string(c.rbuf.buffer[0:1]), line)
+	log.Println("exec----------", cmd, args)
 	switch c.rbuf.buffer[0] {
 	case '+':
 		return line, nil
@@ -182,29 +167,34 @@ func (client *Client) sendCommand(cmd string, args ...string) (interface {}, err
 	case ':':
 		return strconv.Atoi(string(line))
 	case '$':
+
 		length, err := strconv.Atoi(string(line))
-		if err != nil {
-			return nil, err
-		}
-
-		if c.rbuf.pos + length + 2 < cap(c.rbuf.buffer) {
-			tmp := make([]byte, c.rbuf.pos + length + 2)
-			copy(tmp, c.rbuf.buffer[:c.rbuf.limit])
-			c.rbuf.buffer = tmp
-		}
-
-		for c.rbuf.pos + length + 2 > c.rbuf.limit {
-			n, err := c.conn.Read(c.rbuf.buffer[c.rbuf.limit:])
+		if length > 0 {
 			if err != nil {
 				return nil, err
 			}
-			c.rbuf.limit += n
+
+			if c.rbuf.pos + length + 2 < cap(c.rbuf.buffer) {
+				tmp := make([]byte, c.rbuf.pos + length + 2)
+				copy(tmp, c.rbuf.buffer[:c.rbuf.limit])
+				c.rbuf.buffer = tmp
+			}
+
+			for c.rbuf.pos + length + 2 < c.rbuf.limit {
+				n, err := c.conn.Read(c.rbuf.buffer[c.rbuf.limit:])
+				if err != nil {
+					return nil, err
+				}
+				c.rbuf.limit += n
+			}
+			log.Println("---$---", c.rbuf.pos, c.rbuf.limit, length)
+			return c.rbuf.buffer[c.rbuf.pos:c.rbuf.limit - 2], nil
+		} else {
+			return nil, fmt.Errorf("No key %s", args[0])
 		}
 
-		return c.rbuf.buffer[c.rbuf.pos:c.rbuf.limit], nil
 	}
 
-	//
 	return nil, nil
 }
 
@@ -221,3 +211,47 @@ func (client *Client) openConn() (*RedisConn, error) {
 	}
 	return nil, err
 }
+
+func NewClient(addr string, db int) (*Client, error) {
+	poolSize := defaultPoolSize
+	pool := make(chan *RedisConn, poolSize)
+	for i := 0; i < poolSize; i++ {
+		pool <- nil
+	}
+	client := &Client{Addr: addr, Db: db, pool: pool}
+	_, err := client.getCon()
+	if err != nil {
+		return nil, err
+	} else {
+		return client, nil
+	}
+}
+
+func (c *Client) Get(key string) (string, error) {
+	value, err := c.sendCommand("GET", key)
+	if err != nil {
+		return "", err
+	}
+	return string(value.([]byte)), err
+}
+
+func (c *Client) Set(key, value string) error {
+	v, err := c.sendCommand("GET", key)
+	if err != nil {
+		return err
+	}
+	log.Println("----------set----------", string(v.([]byte)))
+	return nil
+}
+
+func (c *Client) Del(key string) error {
+	v, err := c.sendCommand("Del", key)
+	if err != nil {
+		return err
+	}
+	log.Println("----------del----------", v)
+	return nil
+}
+
+
+
