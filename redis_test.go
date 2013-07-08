@@ -9,7 +9,7 @@ import (
 
 const (
 	myKey   = "mykey"
-	myValue = "myValue"
+	myValue = "myValue10000000000000000"
 )
 
 var client *Client
@@ -49,7 +49,6 @@ func TestEncodingRequest(t *testing.T) {
 }
 
 func TestSet(t *testing.T) {
-
 	client.Set(myKey, myValue)
 	for i := 0; i < 4; i++ {
 		v, _ := client.GetString(myKey)
@@ -78,7 +77,39 @@ func TestSet(t *testing.T) {
 	}
 
 	client.Del(myKey)
-	client.Setex(myKey, []byte(myValue))
+	_, err := client.Get(myKey)
+	if err != doesNotExist {
+		t.Error("should return Key does not exits")
+	}
+
+	vs, _ := client.MGet(myKey, myKey)
+	for _, v := range vs {
+		if v != nil {
+			t.Error("Mget not exits key should return nil")
+		}
+	}
+
+	client.Setex(myKey, 10, []byte(myValue))
+	v, _ = client.Get(myKey)
+	if string(v) != myValue {
+		t.Errorf("get %s, but shoule be %s\n", v, myValue)
+	}
+
+	vs, _ = client.MGet(myKey, myKey)
+	for _, v := range vs {
+		if string(v) != myValue {
+			t.Errorf("Mget does not return the right value, get %s, should be %s", string(v), myValue)
+		}
+	}
+
+	client.Del(myKey)
+}
+
+func TestPing(t *testing.T) {
+	err := client.Ping()
+	if err != nil {
+		t.Errorf("ping err", err)
+	}
 }
 
 func TestHmset(t *testing.T) {
@@ -105,10 +136,32 @@ func BenchmarkGetConn(b *testing.B) {
 	}
 }
 
+func BenchmarkPing(b *testing.B) {
+	for i := 0; i < b.N; i ++ {
+		client.Ping()
+	}
+}
+
 func BenchmarkGet(b *testing.B) {
 	client.Set(myKey, myValue)
 	for i := 0; i < b.N; i++ {
 		client.Get(myKey)
+	}
+	client.Del(myKey)
+}
+
+func BenchmarkM10Get(b *testing.B) {
+	client.Set(myKey, myValue)
+	for i := 0; i < b.N; i++ {
+		client.MGet(myKey, myKey, myKey, myKey, myKey, myKey, myKey, myKey, myKey, myKey)
+	}
+	client.Del(myKey)
+}
+
+func BenchmarkM10GetString(b *testing.B) {
+	client.Set(myKey, myValue)
+	for i := 0; i < b.N; i++ {
+		client.MGetString(myKey, myKey, myKey, myKey, myKey, myKey, myKey, myKey, myKey, myKey)
 	}
 	client.Del(myKey)
 }
