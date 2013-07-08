@@ -12,7 +12,7 @@ import (
 
 const (
 	defaultPoolSize = 5
-	bufferSize      = 1024*24
+	bufferSize      = 1024 * 24
 )
 
 type RedisError string
@@ -21,9 +21,92 @@ func (err RedisError) Error() string { return "Redis Error: " + string(err) }
 
 var doesNotExist = RedisError("Key does not exist")
 
+func toBytes(value interface{}) []byte {
+	switch v := value.(type) {
+	case string:
+		return []byte(v)
+	case []byte:
+		return v
+	}
+	panic("Only []byte, string is understandable")
+}
+
+func copyBytes(b []byte) (r []byte) {
+	return append(r, b...)
+}
+
+func (client *Client) blockPop(cmd string, key interface{}, seconds int) ([]byte, string, error) {
+	var args [][]byte
+	switch v := key.(type) {
+	case string:
+		args = append(args, []byte(v))
+	case []string:
+		for _, s := range v {
+			args = append(args, []byte(s))
+		}
+	default:
+		panic("Only string or []string is allowed in blocking pop")
+	}
+	args = append(args, []byte(strconv.Itoa(seconds)))
+
+	c, err := client.getCon()
+	defer func() {
+		client.returnCon(c)
+	}()
+	if err != nil {
+		return nil, "", err
+	}
+
+	value, err := c.sendCommand(cmd, args...)
+	if err != nil {
+		return nil, "", err
+	}
+
+	if value != nil {
+		vs := value.([]interface{})
+		return copyBytes(vs[1].([]byte)), string(vs[0].([]byte)), nil
+	}
+	return nil, "", nil
+}
+
+func (client *Client) listPush(cmd string, key string, values interface{}) (int, error) {
+	var args [][]byte
+	args = append(args, []byte(key))
+
+	switch v := values.(type) {
+	case string:
+		args = append(args, []byte(v))
+	case []string:
+		for _, s := range v {
+			args = append(args, []byte(s))
+		}
+	case []byte:
+		args = append(args, v)
+	case [][]byte:
+		for _, s := range v {
+			args = append(args, s)
+		}
+	}
+
+	c, err := client.getCon()
+	defer func() {
+		client.returnCon(c)
+	}()
+	if err != nil {
+		return 0, err
+	}
+
+	value, err := c.sendCommand(cmd, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	return value.(int), nil
+}
+
 type ByteBuffer struct {
-	buffer              []byte
-	pos,          limit int
+	buffer     []byte
+	pos, limit int
 }
 
 type RedisConn struct {
@@ -39,7 +122,7 @@ func (p *ByteBuffer) writeInt(i int) {
 	} else {
 		pos := p.pos
 		start := pos
-		for ; i > 0; i = i/10 {
+		for ; i > 0; i = i / 10 {
 			p.buffer[pos] = byte(i%10 + '0')
 			pos += 1
 		}
@@ -54,19 +137,9 @@ func (p *ByteBuffer) writeInt(i int) {
 	}
 }
 
-func toBytes(value interface{}) []byte {
-	switch v := value.(type) {
-	case string:
-		return []byte(v)
-	case []byte:
-		return v
-	}
-	panic("Only []byte, string is understandable")
-}
-
 func (p *ByteBuffer) writeCRLF() {
 	p.buffer[p.pos] = '\r'
-	p.buffer[p.pos + 1] = '\n'
+	p.buffer[p.pos+1] = '\n'
 	p.pos += 2
 }
 
@@ -98,8 +171,8 @@ func (buf *ByteBuffer) encodeRequest(cmd string, args [][]byte) {
 	buf.writeCRLF()
 
 	for _, s := range args {
-		if buf.pos + len(s) + 20 > cap(buf.buffer) {
-			buf.buffer = make([]byte, cap(buf.buffer)*2 + len(s))
+		if buf.pos+len(s)+20 > cap(buf.buffer) {
+			buf.buffer = make([]byte, cap(buf.buffer)*2+len(s))
 		}
 		buf.writeBytes(s)
 		buf.writeCRLF()
@@ -121,7 +194,7 @@ func (client *Client) getCon() (*RedisConn, error) {
 }
 
 func (c *RedisConn) readMore() error {
-	if c.rbuf.limit + 10 > cap(c.rbuf.buffer) {
+	if c.rbuf.limit+10 > cap(c.rbuf.buffer) {
 		copy(c.rbuf.buffer, c.rbuf.buffer[c.rbuf.pos:c.rbuf.limit])
 		pos := c.rbuf.pos
 		c.rbuf.pos = 0
@@ -150,7 +223,7 @@ func (c *RedisConn) readLine() ([]byte, error) {
 		}
 		c.rbuf.pos += 1
 	}
-	return c.rbuf.buffer[start : c.rbuf.pos - 2], nil
+	return c.rbuf.buffer[start : c.rbuf.pos-2], nil
 }
 
 func (c *RedisConn) readResponse() (interface{}, error) {
@@ -179,12 +252,12 @@ func (c *RedisConn) readResponse() (interface{}, error) {
 			if err != nil {
 				return nil, err
 			}
-			if c.rbuf.pos + length + 2 > cap(c.rbuf.buffer) {
-				tmp := make([]byte, c.rbuf.pos + length + 2)
+			if c.rbuf.pos+length+2 > cap(c.rbuf.buffer) {
+				tmp := make([]byte, c.rbuf.pos+length+2)
 				copy(tmp, c.rbuf.buffer[:c.rbuf.limit])
 				c.rbuf.buffer = tmp
 			}
-			for c.rbuf.pos + length + 2 > c.rbuf.limit {
+			for c.rbuf.pos+length+2 > c.rbuf.limit {
 				err := c.readMore()
 				if err != nil {
 					return nil, err
@@ -192,7 +265,7 @@ func (c *RedisConn) readResponse() (interface{}, error) {
 			}
 			start := c.rbuf.pos
 			c.rbuf.pos += length + 2
-			return c.rbuf.buffer[start : c.rbuf.pos - 2], nil
+			return c.rbuf.buffer[start : c.rbuf.pos-2], nil
 		} else {
 			return nil, nil
 		}
@@ -241,21 +314,6 @@ func (client *Client) openConn() (*RedisConn, error) {
 	return nil, err
 }
 
-func NewClient(addr string, db int) (*Client, error) {
-	poolSize := defaultPoolSize
-	pool := make(chan *RedisConn, poolSize)
-	for i := 0; i < poolSize; i++ {
-		pool <- nil
-	}
-	client := &Client{Addr: addr, Db: db, pool: pool}
-	_, err := client.getCon()
-	if err != nil {
-		return nil, err
-	} else {
-		return client, nil
-	}
-}
-
 func mappingToArgs(v reflect.Value, args *[][]byte) error {
 	switch v.Kind() {
 	case reflect.Ptr:
@@ -278,6 +336,21 @@ func mappingToArgs(v reflect.Value, args *[][]byte) error {
 		return nil
 	}
 	panic("v")
+}
+
+func NewClient(addr string, db int) (*Client, error) {
+	poolSize := defaultPoolSize
+	pool := make(chan *RedisConn, poolSize)
+	for i := 0; i < poolSize; i++ {
+		pool <- nil
+	}
+	client := &Client{Addr: addr, Db: db, pool: pool}
+	_, err := client.getCon()
+	if err != nil {
+		return nil, err
+	} else {
+		return client, nil
+	}
 }
 
 func (client *Client) Hmset(key string, mapping map[string]interface{}) error {
@@ -376,10 +449,7 @@ func (client *Client) Get(key string) ([]byte, error) {
 	if value == nil {
 		return nil, doesNotExist
 	}
-	val := value.([]byte)
-	copied := make([]byte, len(val))
-	// value is just a reference to a buffer, need copy to protect buffer
-	copy(copied, val)
+	val := copyBytes(value.([]byte))
 	return val, err
 }
 
@@ -426,16 +496,29 @@ func (client *Client) MGet(keys ...string) ([][]byte, error) {
 	rets := make([][]byte, len(values.([]interface{})))
 	for i, v := range values.([]interface{}) {
 		if v != nil {
-			val := v.([]byte)
-			copied := make([]byte, len(val))
-			copy(copied, val)
-			rets[i] = copied
+			rets[i] = copyBytes(v.([]byte))
 		} else {
 			rets[i] = nil
 		}
 	}
 
 	return rets, err
+}
+
+func (client *Client) Brpop(lists interface{}, seconds int) ([]byte, string, error) {
+	return client.blockPop("BRPOP", lists, seconds)
+}
+
+func (client *Client) Blpop(lists interface{}, seconds int) ([]byte, string, error) {
+	return client.blockPop("BLPOP", lists, seconds)
+}
+
+func (client *Client) Lpush(key string, values interface{}) (int, error) {
+	return client.listPush("LPUSH", key, values)
+}
+
+func (client *Client) Rpush(key string, values interface{}) (int, error) {
+	return client.listPush("RPUSH", key, values)
 }
 
 func (client *Client) GetString(key string) (string, error) {

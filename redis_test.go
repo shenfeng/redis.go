@@ -16,6 +16,8 @@ var client *Client
 
 var testObj map[string]interface{} = map[string]interface{}{"key1": "value1", "key2": "value2", "key3": 101}
 
+var bytes []byte = []byte{1, 2, 3, 4, 5, 6, 7, 8 , 9, 0}
+
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -46,6 +48,20 @@ func TestEncodingRequest(t *testing.T) {
 	if encoded != expect {
 		t.Errorf("get %s, but should be %s\n", encoded, expect)
 	}
+}
+
+func TestBlocking(t *testing.T) {
+	client.Del(myKey)
+
+	go func() {
+		client.Lpush(myKey, myValue)
+	}()
+
+	v, key, _ := client.Brpop(myKey, 0)
+	if string(v) != myValue || key != myKey {
+		t.Errorf("Brpop get %s", string(v))
+	}
+
 }
 
 func TestSet(t *testing.T) {
@@ -139,6 +155,19 @@ func BenchmarkGetConn(b *testing.B) {
 func BenchmarkPing(b *testing.B) {
 	for i := 0; i < b.N; i ++ {
 		client.Ping()
+	}
+}
+
+func BenchmarkBlockingPushPop(b *testing.B) {
+	client.Del(myKey)
+	go func() {
+		for i := 0; i < b.N; i++ {
+			client.Rpush(myKey, myValue)
+		}
+	}()
+
+	for i := 0; i < b.N; i ++ {
+		client.Blpop(myKey, 0)
 	}
 }
 
