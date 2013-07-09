@@ -21,6 +21,8 @@ func (err RedisError) Error() string { return "Redis Error: " + string(err) }
 
 var doesNotExist = RedisError("Key does not exist")
 
+// var hsetKey = RedisError("Key does not exist")
+
 func toBytes(value interface{}) []byte {
 	switch v := value.(type) {
 	case string:
@@ -416,38 +418,6 @@ func (client *Client) Setnx(key string, data interface{}) (bool, error) {
 	return v.(int) == 1, nil
 }
 
-func (client *Client) Ping() error {
-	c, err := client.getCon()
-	if err != nil {
-		return err
-	}
-	_, err = c.sendCommand("PING")
-	client.returnCon(c)
-	return err
-}
-
-func (client *Client) Setex(key string, seconds int, data interface{}) error {
-	c, err := client.getCon()
-	_, err = c.sendCommand("SETEX", []byte(key), []byte(strconv.Itoa(seconds)), toBytes(data))
-	client.returnCon(c)
-
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (client *Client) Set(key string, data interface{}) error {
-	c, err := client.getCon()
-	_, err = c.sendCommand("SET", []byte(key), toBytes(data))
-	client.returnCon(c)
-
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (client *Client) Get(key string) ([]byte, error) {
 	c, err := client.getCon()
 	defer func() {
@@ -517,6 +487,12 @@ func (client *Client) MGet(keys ...string) ([][]byte, error) {
 	return rets, err
 }
 
+// func (client *Client) Hmset(key string, args ...[]interface{}) error {
+// 	if len(args)%2 != 0 {
+// 		return RedisError("Hmset key value")
+// 	}
+// }
+
 func (client *Client) Brpop(lists interface{}, seconds int) ([]byte, string, error) {
 	return client.blockPop("BRPOP", lists, seconds)
 }
@@ -549,12 +525,34 @@ func (client *Client) GetString(key string) (string, error) {
 	return string(value.([]byte)), err
 }
 
-func (client *Client) Del(key string) error {
+func (client *Client) simple(cmd string, args ...[]byte) error {
 	c, err := client.getCon()
-	_, err = c.sendCommand("Del", []byte(key))
-	client.returnCon(c)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		client.returnCon(c)
+	}()
+
+	_, err = c.sendCommand(cmd, args...)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (client *Client) Ping() error {
+	return client.simple("PING")
+}
+
+func (client *Client) Setex(key string, seconds int, data interface{}) error {
+	return client.simple("SETEX", []byte(key), []byte(strconv.Itoa(seconds)), toBytes(data))
+}
+
+func (client *Client) Set(key string, data interface{}) error {
+	return client.simple("SET", []byte(key), toBytes(data))
+}
+
+func (client *Client) Del(key string) error {
+	return client.simple("Del", []byte(key))
 }
