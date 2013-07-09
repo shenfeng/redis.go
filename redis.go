@@ -309,9 +309,21 @@ func (client *Client) openConn() (*RedisConn, error) {
 	if err == nil {
 		rb := &ByteBuffer{buffer: make([]byte, bufferSize)}
 		wb := &ByteBuffer{buffer: make([]byte, bufferSize)}
-		return &RedisConn{conn: c, rbuf: rb, wbuf: wb}, nil
+		c := &RedisConn{conn: c, rbuf: rb, wbuf: wb}
+		if client.Db > 0 {
+			c.Select(client.Db)
+		}
+		return c, nil
 	}
 	return nil, err
+}
+
+func (c *RedisConn) Select(db int) (int, error) {
+	r, err := c.sendCommand("SELECT", []byte(strconv.Itoa(db)))
+	if err != nil {
+		return 0, err
+	}
+	return r.(int), nil
 }
 
 func mappingToArgs(v reflect.Value, args *[][]byte) error {
