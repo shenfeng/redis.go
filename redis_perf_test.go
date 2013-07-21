@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"net"
 	"testing"
 )
 
@@ -49,4 +50,21 @@ func BenchmarkHmset(b *testing.B) {
 		client.Hmset(myKey, testObj)
 	}
 	client.Del(myKey)
+}
+
+func BenchmarkRawUpperLimit(b *testing.B) {
+	c, err := net.Dial("tcp", "localhost:6379")
+
+	if err != nil {
+		b.Error(err)
+	} else {
+		buffer := make([]byte, 1024)
+		ping := []byte("*1\r\n$4\r\nPING\r\n")
+
+		for i := 0; i < b.N; i++ {
+			c.Write(ping)
+			c.Read(buffer)
+		}
+	}
+	c.Close()
 }
