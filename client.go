@@ -45,6 +45,15 @@ func (client *Client) returnCon(c *RedisConn) {
 	client.mu.Unlock()
 }
 
+func (client *Client) closeAll() {
+	client.mu.Lock()
+	for _, c := range client.cons {
+		c.conn.Close()
+	}
+	client.cons = nil
+	client.mu.Unlock()
+}
+
 func (client *Client) getCon() (con *RedisConn, err error) {
 	client.mu.Lock()
 	if len(client.cons) > 0 {
@@ -66,7 +75,7 @@ func (client *Client) openConn() (*RedisConn, error) {
 		wb := &ByteBuffer{buffer: make([]byte, BufferSize)}
 		c := &RedisConn{conn: c, rbuf: rb, wbuf: wb}
 		if client.Db > 0 {
-			c.sendCommand("SELECT", []byte(strconv.Itoa(client.Db)))
+			c.send("SELECT", false, []byte(strconv.Itoa(client.Db)))
 		}
 		if client.MaxCon == 0 {
 			client.MaxCon = DefaultMaxCon
@@ -76,21 +85,30 @@ func (client *Client) openConn() (*RedisConn, error) {
 	return nil, err
 }
 
-func (client *Client) simple(cmd string, args ...[]byte) error {
-	c, err := client.getCon()
-	if err != nil {
-		return err
-	}
-	defer client.returnCon(c)
+func (client *Client) sendCommand(cmd string, newRbuf bool,
+	args ...[]byte) (interface{}, error) {
 
-	_, err = c.sendCommand(cmd, args...)
+	if c, err := client.getCon(); err != nil {
+		return nil, err
+	} else {
+		r, err := c.send(cmd, newRbuf, args...)
+		if err == nil { // TODO, only network, retry if network error
+			client.returnCon(c)
+		}
+		return r, err
+	}
+}
+
+func (client *Client) simple(cmd string, args ...[]byte) error {
+	_, err := client.sendCommand(cmd, false, args...)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (client *Client) blockPop(cmd string, key interface{}, seconds int) ([]byte, string, error) {
+func (client *Client) blockPop(cmd string, key interface{},
+	seconds int) ([]byte, string, error) {
 	var args [][]byte
 	switch v := key.(type) {
 	case string:
@@ -104,25 +122,20 @@ func (client *Client) blockPop(cmd string, key interface{}, seconds int) ([]byte
 	}
 	args = append(args, []byte(strconv.Itoa(seconds)))
 
-	c, err := client.getCon()
-	defer client.returnCon(c)
-	if err != nil {
-		return nil, "", err
-	}
-
-	value, err := c.sendCommand(cmd, args...)
+	value, err := client.sendCommand(cmd, true, args...)
 	if err != nil {
 		return nil, "", err
 	}
 
 	if value != nil {
 		vs := value.([]interface{})
-		return copyBytes(vs[1].([]byte)), string(vs[0].([]byte)), nil
+		return vs[1].([]byte), string(vs[0].([]byte)), nil
 	}
 	return nil, "", nil
 }
 
-func (client *Client) listPush(cmd string, key string, values interface{}) (int, error) {
+func (client *Client) listPush(cmd string, key string,
+	values interface{}) (int, error) {
 	var args [][]byte
 	args = append(args, []byte(key))
 
@@ -141,13 +154,7 @@ func (client *Client) listPush(cmd string, key string, values interface{}) (int,
 		}
 	}
 
-	c, err := client.getCon()
-	defer client.returnCon(c)
-	if err != nil {
-		return 0, err
-	}
-
-	value, err := c.sendCommand(cmd, args...)
+	value, err := client.sendCommand(cmd, false, args...)
 	if err != nil {
 		return 0, err
 	}

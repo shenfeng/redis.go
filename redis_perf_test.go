@@ -1,15 +1,16 @@
 package redis
 
 import (
+	// "log"
 	"net"
 	"runtime"
 	"testing"
 )
 
 const (
-	TestServer                 = "localhost:6379"
-	TRANSPORT_BINARY_DATA_SIZE = 1024 * 1
-	test_key                   = "test_key"
+	TestServer   = "localhost:6379"
+	TESTBYTESIZE = 1024 * 15
+	test_key     = "test_key"
 )
 
 var (
@@ -18,8 +19,8 @@ var (
 
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	rand_data = make([]byte, TRANSPORT_BINARY_DATA_SIZE)
-	for i := 0; i < TRANSPORT_BINARY_DATA_SIZE; i++ {
+	rand_data = make([]byte, TESTBYTESIZE)
+	for i := 0; i < TESTBYTESIZE; i++ {
 		rand_data[i] = byte((i + 'a') % 255)
 	}
 }
@@ -36,7 +37,7 @@ func BenchmarkEncodingRequest(b *testing.B) {
 
 	// c, _ := net.Dial("tcp", TestServer)
 	// log.Println(c.Write(buf.buffer[:buf.pos + 1]))
-	// buffer := make([]byte, TRANSPORT_BINARY_DATA_SIZE)
+	// buffer := make([]byte, TESTBYTESIZE)
 
 	// n, _ := c.Read(buffer)
 	// log.Println(string(buffer[:n+1]))
@@ -70,23 +71,22 @@ func BenchmarkPing(b *testing.B) {
 	}
 }
 
-func BenchmarkBlockingPushPop(b *testing.B) {
-	client.Del(myKey)
-	go func() {
-		for i := 0; i < b.N; i++ {
-			client.Rpush(myKey, myValue)
-		}
-	}()
-
-	for i := 0; i < b.N; i++ {
-		client.Blpop(myKey, 0)
-	}
-}
+// func BenchmarkBlockingPushPop(b *testing.B) {
+// 	client.Del(myKey)
+// 	go func(N int) {
+// 		for i := 0; i < N*2; i++ {
+// 			client.Rpush(myKey, myValue)
+// 		}
+// 	}(b.N)
+// 	for i := 0; i < b.N; i++ {
+// 		client.Blpop(myKey, 0)
+// 	}
+// }
 
 func BenchmarkGetBytes(b *testing.B) {
 	client.Set(myKey, rand_data)
 	b.ResetTimer()
-	b.SetBytes(TRANSPORT_BINARY_DATA_SIZE)
+	b.SetBytes(TESTBYTESIZE)
 	for i := 0; i < b.N; i++ {
 		client.Get(myKey)
 	}
@@ -160,7 +160,7 @@ func BenchmarkRawRedisConnPing(b *testing.B) {
 		c := &RedisConn{conn: c, rbuf: rb, wbuf: wb}
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			c.sendCommand("PING")
+			c.send("PING", false)
 		}
 		c.conn.Close()
 	}
@@ -176,7 +176,7 @@ func BenchmarkRawRedisConnSet(b *testing.B) {
 		c := &RedisConn{conn: c, rbuf: rb, wbuf: wb}
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			c.sendCommand("SET", []byte(test_key), rand_data)
+			c.send("SET", false, []byte(test_key), rand_data)
 		}
 		c.conn.Close()
 	}
@@ -191,9 +191,9 @@ func BenchmarkRawRedisConnGet(b *testing.B) {
 		wb := &ByteBuffer{buffer: make([]byte, BufferSize)}
 		c := &RedisConn{conn: c, rbuf: rb, wbuf: wb}
 		b.ResetTimer()
-		b.SetBytes(TRANSPORT_BINARY_DATA_SIZE)
+		b.SetBytes(TESTBYTESIZE)
 		for i := 0; i < b.N; i++ {
-			c.sendCommand("GET", []byte(test_key))
+			c.send("GET", false, []byte(test_key))
 		}
 		c.conn.Close()
 	}

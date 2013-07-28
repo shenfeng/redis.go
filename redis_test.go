@@ -29,10 +29,10 @@ func init() {
 }
 
 func TestWriteInt(t *testing.T) {
-	for i := 23; i < 40; i++ {
+	for i := 0; i < 400; i += 13 {
 		b := &ByteBuffer{buffer: make([]byte, 1024)}
 		b.writeInt(i)
-		if string(b.buffer[:b.pos]) != strconv.Itoa(i) {
+		if string(b.buffer[:b.pos-2]) != strconv.Itoa(i) {
 			t.Errorf("itoa %d get %s\n", i, string(b.buffer[:b.pos]))
 		}
 	}
@@ -61,7 +61,6 @@ func TestBlocking(t *testing.T) {
 	if string(v) != myValue || key != myKey {
 		t.Errorf("Brpop get %s", string(v))
 	}
-
 }
 
 func TestSet(t *testing.T) {
@@ -138,5 +137,5 @@ func TestSelect(t *testing.T) {
 func TestHmset(t *testing.T) {
 	client.Del(myKey)
 	client.Hmset(myKey, testObj)
-	client.Hgetall(myKey)
+	// client.Hgetall(myKey)
 }

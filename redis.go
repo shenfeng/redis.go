@@ -6,7 +6,7 @@ import (
 
 const (
 	DefaultMaxCon = 5
-	BufferSize    = 1024 * 24
+	BufferSize    = 1024 * 2
 )
 
 type RedisError string
@@ -17,30 +17,8 @@ var KeyDoesNotExist = RedisError("Key does not exist")
 
 // var hsetKey = RedisError("Key does not exist")
 
-func (client *Client) Hmset(key string, mapping map[string]interface{}) error {
-	c, err := client.getCon()
-	defer client.returnCon(c)
-
-	var args [][]byte
-	args = append(args, []byte(key))
-	// err := mappingToArgs(reflect.ValueOf(mapping), &args)
-
-	if err != nil {
-		return err
-	}
-
-	_, err = c.sendCommand("HMSET", args...)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (client *Client) Hgetall(key string) (m map[string]string, err error) {
-	c, err := client.getCon()
-	defer client.returnCon(c)
-
-	rets, err := c.sendCommand("HGETALL", []byte(key))
+	rets, err := client.sendCommand("HGETALL", true, []byte(key))
 	if err != nil {
 		return m, err
 	}
@@ -52,10 +30,7 @@ func (client *Client) Hgetall(key string) (m map[string]string, err error) {
 }
 
 func (client *Client) Setnx(key string, data interface{}) (bool, error) {
-	c, err := client.getCon()
-	defer client.returnCon(c)
-
-	v, err := c.sendCommand("SETNX", []byte(key), toBytes(data))
+	v, err := client.sendCommand("SETNX", false, []byte(key), toBytes(data))
 	if err != nil {
 		return false, err
 	}
@@ -63,29 +38,22 @@ func (client *Client) Setnx(key string, data interface{}) (bool, error) {
 }
 
 func (client *Client) Get(key string) ([]byte, error) {
-	c, err := client.getCon()
-	defer client.returnCon(c)
-
-	value, err := c.sendCommand("GET", []byte(key))
+	value, err := client.sendCommand("GET", false, []byte(key))
 	if err != nil {
 		return nil, err
 	}
 	if value == nil {
 		return nil, KeyDoesNotExist
 	}
-	val := copyBytes(value.([]byte))
-	return val, err
+	return copyBytes(value.([]byte)), err
 }
 
 func (client *Client) MGetString(keys ...string) ([]string, error) {
-	c, err := client.getCon()
-	defer client.returnCon(c)
-
 	ks := make([][]byte, len(keys))
 	for i, v := range keys {
 		ks[i] = []byte(v)
 	}
-	values, err := c.sendCommand("MGET", ks...)
+	values, err := client.sendCommand("MGET", false, ks...)
 	if err != nil {
 		return nil, err
 	}
@@ -102,21 +70,18 @@ func (client *Client) MGetString(keys ...string) ([]string, error) {
 }
 
 func (client *Client) MGet(keys ...string) ([][]byte, error) {
-	c, err := client.getCon()
-	defer client.returnCon(c)
-
 	ks := make([][]byte, len(keys))
 	for i, v := range keys {
 		ks[i] = []byte(v)
 	}
-	values, err := c.sendCommand("MGET", ks...)
+	values, err := client.sendCommand("MGET", true, ks...)
 	if err != nil {
 		return nil, err
 	}
 	rets := make([][]byte, len(values.([]interface{})))
 	for i, v := range values.([]interface{}) {
 		if v != nil {
-			rets[i] = copyBytes(v.([]byte))
+			rets[i] = v.([]byte)
 		} else {
 			rets[i] = nil
 		}
@@ -145,7 +110,7 @@ func (client *Client) GetString(key string) (string, error) {
 	c, err := client.getCon()
 	defer client.returnCon(c)
 
-	value, err := c.sendCommand("GET", []byte(key))
+	value, err := client.sendCommand("GET", false, []byte(key))
 	if err != nil {
 		return "", err
 	}
@@ -173,4 +138,11 @@ func (client *Client) Set(key string, data interface{}) error {
 
 func (client *Client) Del(key string) error {
 	return client.simple("Del", []byte(key))
+}
+
+func (client *Client) Hmset(key string, mapping map[string]interface{}) error {
+	var args [][]byte
+	args = append(args, []byte(key))
+
+	return client.simple("HMSET", args...)
 }
