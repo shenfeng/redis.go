@@ -16,7 +16,7 @@ var client *Client
 
 var testObj map[string]interface{} = map[string]interface{}{"key1": "value1", "key2": "value2", "key3": 101}
 
-var bytes []byte = []byte{1, 2, 3, 4, 5, 6, 7, 8 , 9, 0}
+var bytes []byte = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
@@ -94,7 +94,7 @@ func TestSet(t *testing.T) {
 
 	client.Del(myKey)
 	_, err := client.Get(myKey)
-	if err != doesNotExist {
+	if err != KeyDoesNotExist {
 		t.Error("should return Key does not exits")
 	}
 
@@ -124,7 +124,14 @@ func TestSet(t *testing.T) {
 func TestPing(t *testing.T) {
 	err := client.Ping()
 	if err != nil {
-		t.Errorf("ping err", err)
+		t.Errorf("ping err: %v", err)
+	}
+}
+
+func TestSelect(t *testing.T) {
+	err := client.Select(10)
+	if err != nil {
+		t.Errorf("select err: %v", err)
 	}
 }
 
@@ -132,41 +139,4 @@ func TestHmset(t *testing.T) {
 	client.Del(myKey)
 	client.Hmset(myKey, testObj)
 	client.Hgetall(myKey)
-}
-
-func BenchmarkEncodingRequest(b *testing.B) {
-	buf := &ByteBuffer{buffer: make([]byte, 1024)}
-	tmp := [][]byte{[]byte(myKey), []byte(myValue)}
-	buf.encodeRequest("SET", tmp)
-	b.SetBytes(int64(buf.pos))
-
-	for i := 0; i < b.N; i++ {
-		buf.encodeRequest("SET", tmp)
-	}
-}
-
-func BenchmarkGetConn(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		c, _ := client.getCon()
-		client.returnCon(c)
-	}
-}
-
-func BenchmarkPing(b *testing.B) {
-	for i := 0; i < b.N; i ++ {
-		client.Ping()
-	}
-}
-
-func BenchmarkBlockingPushPop(b *testing.B) {
-	client.Del(myKey)
-	go func() {
-		for i := 0; i < b.N; i++ {
-			client.Rpush(myKey, myValue)
-		}
-	}()
-
-	for i := 0; i < b.N; i ++ {
-		client.Blpop(myKey, 0)
-	}
 }
