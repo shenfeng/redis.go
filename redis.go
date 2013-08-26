@@ -1,8 +1,6 @@
 package redis
 
-import (
-	"strconv"
-)
+import "strconv"
 
 const (
 	DefaultMaxCon = 5
@@ -27,6 +25,31 @@ func (client *Client) Hgetall(key string) (m map[string]string, err error) {
 		// m[rets
 	}
 	return m, err
+}
+
+func (client *Client) Sadd(key string, data interface{}) (bool, error) {
+	v, err := client.sendCommand("SADD", false, []byte(key), toBytes(data))
+	if err != nil {
+		return false, err
+	}
+	return v.(int) == 1, nil
+}
+
+func (client *Client) Smembers(key string) ([]string, error) {
+	value, err := client.sendCommand("SMEMBERS", false, []byte(key))
+	if err != nil {
+		return nil, err
+	}
+
+	if value == nil {
+		return nil, nil
+	}
+
+	rets := make([]string, len(value.([]interface{})))
+	for i, v := range value.([]interface{}) {
+		rets[i] = string(v.([]byte))
+	}
+	return rets, nil
 }
 
 func (client *Client) Setnx(key string, data interface{}) (bool, error) {
@@ -66,7 +89,7 @@ func (client *Client) MGetString(keys ...string) ([]string, error) {
 		}
 	}
 
-	return rets, err
+	return rets, nil
 }
 
 func (client *Client) MGet(keys ...string) ([][]byte, error) {

@@ -134,6 +134,22 @@ func TestSelect(t *testing.T) {
 	}
 }
 
+func TestZset(t *testing.T) {
+	const KEY = "test_key"
+	client.Del(KEY)
+	r, err := client.Smembers(KEY)
+	if r != nil && err != nil {
+		t.Errorf("Failed")
+	}
+	if r, _ := client.Sadd(KEY, "----------"); !r {
+		t.Errorf("Sadd Failed")
+	}
+	client.Sadd(KEY, "abc")
+	if r, _ := client.Smembers(KEY); len(r) != 2 {
+		t.Errorf("Error, should be len 2")
+	}
+}
+
 func TestHmset(t *testing.T) {
 	client.Del(myKey)
 	client.Hmset(myKey, testObj)

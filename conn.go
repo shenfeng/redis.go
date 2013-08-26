@@ -130,6 +130,7 @@ func (c *RedisConn) readResponse() (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	switch c.rbuf.buffer[pos] {
 	// Status Reply, eg: +OK
 	case '+':
