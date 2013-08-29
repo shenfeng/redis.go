@@ -36,20 +36,7 @@ func (client *Client) Sadd(key string, data interface{}) (bool, error) {
 }
 
 func (client *Client) Smembers(key string) ([]string, error) {
-	value, err := client.sendCommand("SMEMBERS", false, []byte(key))
-	if err != nil {
-		return nil, err
-	}
-
-	if value == nil {
-		return nil, nil
-	}
-
-	rets := make([]string, len(value.([]interface{})))
-	for i, v := range value.([]interface{}) {
-		rets[i] = string(v.([]byte))
-	}
-	return rets, nil
+	return client.listCommand("SMEMBERS", []byte(key))
 }
 
 func (client *Client) Ltrim(key string, start, end int) error {
@@ -57,17 +44,7 @@ func (client *Client) Ltrim(key string, start, end int) error {
 }
 
 func (client *Client) Lrange(key string, start, stop int) ([]string, error) {
-	if value, err := client.sendCommand("LRANGE", false, []byte(key), toBytes(start), toBytes(stop)); err != nil {
-		return nil, err
-	} else if value == nil {
-		return nil, nil
-	} else {
-		rets := make([]string, len(value.([]interface{})))
-		for i, v := range value.([]interface{}) {
-			rets[i] = string(v.([]byte))
-		}
-		return rets, nil
-	}
+	return client.listCommand("LRANGE", []byte(key), toBytes(start), toBytes(stop))
 }
 
 func (client *Client) Setnx(key string, data interface{}) (bool, error) {

@@ -107,6 +107,24 @@ func (client *Client) simple(cmd string, args ...[]byte) error {
 	return nil
 }
 
+func (client *Client) listCommand(cmd string, args... []byte) ([]string, error) {
+	value, err := client.sendCommand(cmd, false, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	if value == nil {
+		return nil, nil
+	}
+
+	rets := make([]string, len(value.([]interface{})))
+	for i, v := range value.([]interface{}) {
+		rets[i] = string(v.([]byte))
+	}
+	return rets, nil
+}
+
+
 func (client *Client) blockPop(cmd string, key interface{}, seconds int) ([]byte, string, error) {
 	var args [][]byte
 	switch v := key.(type) {
@@ -119,7 +137,7 @@ func (client *Client) blockPop(cmd string, key interface{}, seconds int) ([]byte
 	default:
 		panic("Only string or []string is allowed in blocking pop")
 	}
-	args = append(args, []byte(strconv.Itoa(seconds)))
+	args = append(args, toBytes(seconds))
 
 	value, err := client.sendCommand(cmd, true, args...)
 	if err != nil {
