@@ -52,6 +52,24 @@ func (client *Client) Smembers(key string) ([]string, error) {
 	return rets, nil
 }
 
+func (client *Client) Ltrim(key string, start, end int) error {
+	return client.simple("LTRIM", []byte(key), toBytes(start), toBytes(end))
+}
+
+func (client *Client) Lrange(key string, start, stop int) ([]string, error) {
+	if value, err := client.sendCommand("LRANGE", false, []byte(key), toBytes(start), toBytes(stop)); err != nil {
+		return nil, err
+	} else if value == nil {
+		return nil, nil
+	} else {
+		rets := make([]string, len(value.([]interface{})))
+		for i, v := range value.([]interface{}) {
+			rets[i] = string(v.([]byte))
+		}
+		return rets, nil
+	}
+}
+
 func (client *Client) Setnx(key string, data interface{}) (bool, error) {
 	v, err := client.sendCommand("SETNX", false, []byte(key), toBytes(data))
 	if err != nil {
@@ -121,11 +139,11 @@ func (client *Client) Blpop(lists interface{}, seconds int) ([]byte, string, err
 	return client.blockPop("BLPOP", lists, seconds)
 }
 
-func (client *Client) Lpush(key string, values interface{}) (int, error) {
+func (client *Client) Lpush(key string, values... interface{}) (int, error) {
 	return client.listPush("LPUSH", key, values)
 }
 
-func (client *Client) Rpush(key string, values interface{}) (int, error) {
+func (client *Client) Rpush(key string, values... interface{}) (int, error) {
 	return client.listPush("RPUSH", key, values)
 }
 

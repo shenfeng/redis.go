@@ -32,7 +32,7 @@ func TestWriteInt(t *testing.T) {
 	for i := 0; i < 400; i += 13 {
 		b := &ByteBuffer{buffer: make([]byte, 1024)}
 		b.writeInt(i)
-		if string(b.buffer[:b.pos-2]) != strconv.Itoa(i) {
+		if string(b.buffer[:b.pos - 2]) != strconv.Itoa(i) {
 			t.Errorf("itoa %d get %s\n", i, string(b.buffer[:b.pos]))
 		}
 	}
@@ -147,6 +147,25 @@ func TestZset(t *testing.T) {
 	client.Sadd(KEY, "abc")
 	if r, _ := client.Smembers(KEY); len(r) != 2 {
 		t.Errorf("Error, should be len 2")
+	}
+}
+
+func TestListRangePushTrim(t *testing.T) {
+	const KEY = "test_key"
+	client.Del(KEY)
+
+	if _, err := client.Lrange(KEY, 0, 100); err != nil {
+		t.Errorf("Lrange not exists key err should be nil")
+	}
+
+	if r, _ := client.Rpush(KEY, "one", "two", "three"); r != 3 {
+		t.Errorf("rpush should return 3")
+	}
+
+	if r, err := client.Lrange(KEY, -2, -1) ; len(r) != 2 {
+		t.Error("lrange error", err)
+	} else if r[0] != "two" {
+		t.Error("lrange expect two")
 	}
 }
 

@@ -24,6 +24,8 @@ func toBytes(value interface{}) []byte {
 		return []byte(v)
 	case []byte:
 		return v
+	case int:
+		return []byte(strconv.Itoa(v))
 	}
 	panic("Only []byte, string is understandable")
 }
@@ -85,9 +87,7 @@ func (client *Client) openConn() (*RedisConn, error) {
 	return nil, err
 }
 
-func (client *Client) sendCommand(cmd string, newRbuf bool,
-	args ...[]byte) (interface{}, error) {
-
+func (client *Client) sendCommand(cmd string, newRbuf bool, args ...[]byte) (interface{}, error) {
 	if c, err := client.getCon(); err != nil {
 		return nil, err
 	} else {
@@ -107,8 +107,7 @@ func (client *Client) simple(cmd string, args ...[]byte) error {
 	return nil
 }
 
-func (client *Client) blockPop(cmd string, key interface{},
-	seconds int) ([]byte, string, error) {
+func (client *Client) blockPop(cmd string, key interface{}, seconds int) ([]byte, string, error) {
 	var args [][]byte
 	switch v := key.(type) {
 	case string:
@@ -134,26 +133,12 @@ func (client *Client) blockPop(cmd string, key interface{},
 	return nil, "", nil
 }
 
-func (client *Client) listPush(cmd string, key string,
-	values interface{}) (int, error) {
-	var args [][]byte
-	args = append(args, []byte(key))
-
-	switch v := values.(type) {
-	case string:
-		args = append(args, []byte(v))
-	case []string:
-		for _, s := range v {
-			args = append(args, []byte(s))
-		}
-	case []byte:
-		args = append(args, v)
-	case [][]byte:
-		for _, s := range v {
-			args = append(args, s)
-		}
+func (client *Client) listPush(cmd string, key string, values []interface{}) (int, error) {
+	args := make([][]byte, len(values) + 1)
+	args[0] = []byte(key)
+	for i, v := range values {
+		args[i+1] = toBytes(v)
 	}
-
 	value, err := client.sendCommand(cmd, false, args...)
 	if err != nil {
 		return 0, err
