@@ -2,6 +2,7 @@ package redis
 
 import (
 	// "log"
+	"math/rand"
 	"net"
 	"runtime"
 	"testing"
@@ -69,6 +70,19 @@ func BenchmarkPing(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		client.Ping()
 	}
+}
+
+func BenchmarkPipelinePing(b *testing.B) {
+	var pipe *Pipeline
+	pipe, _ = client.Pipeline()
+	for i := 0; i < b.N; i++ {
+		pipe.Ping()
+		if rand.Intn(300) == 1 {
+			pipe.Execute()
+			pipe, _ = client.Pipeline()
+		}
+	}
+	pipe.Execute()
 }
 
 // func BenchmarkBlockingPushPop(b *testing.B) {

@@ -32,7 +32,7 @@ func TestWriteInt(t *testing.T) {
 	for i := 0; i < 400; i += 13 {
 		b := &ByteBuffer{buffer: make([]byte, 1024)}
 		b.writeInt(i)
-		if string(b.buffer[:b.pos - 2]) != strconv.Itoa(i) {
+		if string(b.buffer[:b.pos-2]) != strconv.Itoa(i) {
 			t.Errorf("itoa %d get %s\n", i, string(b.buffer[:b.pos]))
 		}
 	}
@@ -150,6 +150,17 @@ func TestZset(t *testing.T) {
 	}
 }
 
+func TestPipeline(t *testing.T) {
+	client.Del(myKey)
+	pipe, _ := client.Pipeline()
+	for i := 0; i < 10; i++ {
+		pipe.Ping()
+	}
+	if err := pipe.Execute(); err != nil {
+		t.Error("pipline execute", err)
+	}
+}
+
 func TestListRangePushTrim(t *testing.T) {
 	const KEY = "test_key"
 	client.Del(KEY)
@@ -162,7 +173,7 @@ func TestListRangePushTrim(t *testing.T) {
 		t.Errorf("rpush should return 3")
 	}
 
-	if r, err := client.Lrange(KEY, -2, -1) ; len(r) != 2 {
+	if r, err := client.Lrange(KEY, -2, -1); len(r) != 2 {
 		t.Error("lrange error", err)
 	} else if r[0] != "two" {
 		t.Error("lrange expect two")

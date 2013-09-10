@@ -107,7 +107,7 @@ func (client *Client) simple(cmd string, args ...[]byte) error {
 	return nil
 }
 
-func (client *Client) listCommand(cmd string, args... []byte) ([]string, error) {
+func (client *Client) listCommand(cmd string, args ...[]byte) ([]string, error) {
 	value, err := client.sendCommand(cmd, false, args...)
 	if err != nil {
 		return nil, err
@@ -123,7 +123,6 @@ func (client *Client) listCommand(cmd string, args... []byte) ([]string, error) 
 	}
 	return rets, nil
 }
-
 
 func (client *Client) blockPop(cmd string, key interface{}, seconds int) ([]byte, string, error) {
 	var args [][]byte
@@ -152,7 +151,7 @@ func (client *Client) blockPop(cmd string, key interface{}, seconds int) ([]byte
 }
 
 func (client *Client) listPush(cmd string, key string, values []interface{}) (int, error) {
-	args := make([][]byte, len(values) + 1)
+	args := make([][]byte, len(values)+1)
 	args[0] = []byte(key)
 	for i, v := range values {
 		args[i+1] = toBytes(v)

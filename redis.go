@@ -116,12 +116,22 @@ func (client *Client) Blpop(lists interface{}, seconds int) ([]byte, string, err
 	return client.blockPop("BLPOP", lists, seconds)
 }
 
-func (client *Client) Lpush(key string, values... interface{}) (int, error) {
+func (client *Client) Lpush(key string, values ...interface{}) (int, error) {
 	return client.listPush("LPUSH", key, values)
 }
 
-func (client *Client) Rpush(key string, values... interface{}) (int, error) {
+func (client *Client) Rpush(key string, values ...interface{}) (int, error) {
 	return client.listPush("RPUSH", key, values)
+}
+
+func (client *Client) Pipeline() (*Pipeline, error) {
+	if c, err := client.getCon(); err == nil {
+		c.wbuf.pos = 0
+		c.rbuf.pos, c.rbuf.limit = 0, 0
+		return &Pipeline{client: client, con: c}, nil
+	} else {
+		return nil, err
+	}
 }
 
 func (client *Client) GetString(key string) (string, error) {
