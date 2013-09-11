@@ -1,5 +1,9 @@
 package redis
 
+import (
+	"strconv"
+)
+
 type Pipeline struct {
 	client *Client
 	con    *RedisConn
@@ -13,9 +17,10 @@ func (pipe *Pipeline) Hincrby(key, field string, inc int) {
 	wbuf.pos += 1
 	wbuf.writeInt(4)
 	wbuf.writeBytes([]byte("HINCRBY"))
+
 	wbuf.writeBytes([]byte(key))
 	wbuf.writeBytes([]byte(field))
-	wbuf.writeInt(inc)
+	wbuf.writeBytes([]byte(strconv.Itoa(inc)))
 }
 
 func (pipe *Pipeline) Ping() {
@@ -39,7 +44,6 @@ func (pipe *Pipeline) Execute() error {
 		pos += n
 	}
 	var e error
-	//	println("-------------", pipe.count)
 	for i := 0; i < pipe.count; i++ {
 		if _, err := c.readResponse(); err != nil {
 			e = err

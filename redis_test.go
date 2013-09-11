@@ -159,6 +159,14 @@ func TestPipeline(t *testing.T) {
 	if err := pipe.Execute(); err != nil {
 		t.Error("pipline execute", err)
 	}
+
+	pipe, _ = client.Pipeline()
+	for i := 0; i < 10; i++ {
+		pipe.Hincrby(myKey, "name", 1)
+	}
+	if err := pipe.Execute(); err != nil {
+		t.Error("pipline execute", err)
+	}
 }
 
 func TestListRangePushTrim(t *testing.T) {
