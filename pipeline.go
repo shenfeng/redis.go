@@ -23,6 +23,17 @@ func (pipe *Pipeline) Hincrby(key, field string, inc int) {
 	wbuf.writeBytes([]byte(strconv.Itoa(inc)))
 }
 
+func (pipe *Pipeline) Expire(key string, seconds int) {
+	pipe.count += 1
+	wbuf := pipe.con.wbuf
+	wbuf.buffer[wbuf.pos] = '*'
+	wbuf.pos += 1
+	wbuf.writeInt(3)
+	wbuf.writeBytes([]byte("EXPIRE"))
+	wbuf.writeBytes([]byte(key))
+	wbuf.writeBytes([]byte(strconv.Itoa(seconds)))
+}
+
 func (pipe *Pipeline) Ping() {
 	pipe.count += 1
 	wbuf := pipe.con.wbuf

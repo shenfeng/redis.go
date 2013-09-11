@@ -164,6 +164,7 @@ func TestPipeline(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		pipe.Hincrby(myKey, "name", 1)
 	}
+	pipe.Expire(myKey, 1001)
 	if err := pipe.Execute(); err != nil {
 		t.Error("pipline execute", err)
 	}
