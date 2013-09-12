@@ -49,6 +49,9 @@ func (pipe *Pipeline) Execute() error {
 	for pos < c.wbuf.pos {
 		n, err := c.conn.Write(c.wbuf.buffer[pos:c.wbuf.pos])
 		if err != nil {
+			if c.conn != nil {
+				c.conn.Close()
+			}
 			return err
 		}
 		pos += n
@@ -59,6 +62,10 @@ func (pipe *Pipeline) Execute() error {
 			e = err
 		}
 	}
-	pipe.client.returnCon(pipe.con)
+	if e == nil {
+		pipe.client.returnCon(pipe.con)
+	} else if c.conn != nil {
+		c.conn.Close()
+	}
 	return e
 }
