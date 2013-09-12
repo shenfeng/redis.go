@@ -44,7 +44,6 @@ func (pipe *Pipeline) Ping() {
 }
 
 func (pipe *Pipeline) Execute() error {
-	defer pipe.client.returnCon(pipe.con)
 	c := pipe.con
 	pos := 0
 	for pos < c.wbuf.pos {
@@ -60,5 +59,6 @@ func (pipe *Pipeline) Execute() error {
 			e = err
 		}
 	}
+	pipe.client.returnCon(pipe.con)
 	return e
 }
