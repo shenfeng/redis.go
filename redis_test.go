@@ -3,6 +3,7 @@ package redis
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"strconv"
 	"testing"
 )
@@ -186,6 +187,22 @@ func TestListRangePushTrim(t *testing.T) {
 		t.Error("lrange error", err)
 	} else if r[0] != "two" {
 		t.Error("lrange expect two")
+	}
+}
+
+const ALL_STR = "abcdefsfdsfsfsdfsfsdfsssssssssssssssssssssjsjslsjsljsjlsjljslllllllllllllllllllllllllllsljsjllllllllllllllllllllllslj"
+
+func TestListRangePushBug(t *testing.T) {
+	const KEY = "test_key"
+
+	for n := 0; n < 1000; n++ {
+		client.Del(KEY)
+		size := rand.Intn(130)
+		for i := 0; i < size; i++ {
+			client.Rpush(KEY, ALL_STR[:rand.Intn(len(ALL_STR))])
+		}
+		_, _ = client.Lrange(KEY, -size, -1)
+
 	}
 }
 
