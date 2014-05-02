@@ -160,8 +160,9 @@ func BenchmarkRawConnPing(b *testing.B) {
 			c.Write(ping)
 			c.Read(buffer)
 		}
+		c.Close()
 	}
-	c.Close()
+
 }
 
 func BenchmarkRawRedisConnPing(b *testing.B) {

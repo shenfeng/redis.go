@@ -107,19 +107,13 @@ func (c *RedisConn) readLine() ([]byte, error) {
 				return nil, err
 			}
 		}
-		if c.rbuf.buffer[c.rbuf.pos] == '\r' {
-			if c.rbuf.pos+2 > c.rbuf.limit {
-				c.rbuf.moreSpace(128, false)
-				err := c.readMore()
-				if err != nil {
-					return nil, err
-				}
-			}
-			c.rbuf.pos += 2
+		if c.rbuf.buffer[c.rbuf.pos] == '\n' {
+			c.rbuf.pos += 1
 			break
 		}
 		c.rbuf.pos += 1
 	}
+
 	return c.rbuf.buffer[start : c.rbuf.pos-2], nil
 }
 
@@ -166,7 +160,7 @@ func (c *RedisConn) readResponse() (interface{}, error) {
 			c.rbuf.pos += length + 2
 			return c.rbuf.buffer[start : c.rbuf.pos-2], nil
 		} else if length == 0 {
-			return []byte(""), nil
+			return c.readLine()
 		} else {
 			// NULL Bulk Reply, do not return an empty string, but a nil object,
 			return nil, nil
